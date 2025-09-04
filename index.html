@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SIMLAB IPA — Plus (Inventaris, Peminjaman, QR per-unit, Rekap)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    :root{
+      --muted:#64748b;
+      --ink:#0f172a;
+      --soft:#f8fafc;
+    }
+    body{font-family:'Inter',sans-serif;background:var(--soft);color:var(--ink)}
+    .sidebar{transition:transform .3s ease-in-out}
+    .sidebar-item{transition:all .2s ease}
+    .sidebar-item:hover,.sidebar-item.active{background:#3b82f6;color:#fff;transform:translateX(4px)}
+    .content-section{display:none;animation:fadeIn .35s ease}
+    .content-section.active{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .modal{transition:opacity .25s ease}
+    .modal-content{transition:all .25s ease;transform:scale(.97)}
+    .modal.show .modal-content{transform:scale(1)}
+    main::-webkit-scrollbar{width:8px}
+    main::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:8px}
+    main::-webkit-scrollbar-track{background:#f1f5f9}
+
+    .chip{font-size:.70rem}
+    .badge{padding:.15rem .5rem;border-radius:9999px;font-size:.75rem;font-weight:600;display:inline-block}
+    .badge.green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .badge.yellow{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+    .badge.rose{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .badge.gray{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+    .tag{border:1px solid #e2e8f0;background:#f8fafc;border-radius:9999px;padding:.1rem .45rem;display:inline-block}
+    .kbd{border:1px solid #e5e7eb;border-bottom-width:3px;padding:.05rem .4rem;border-radius:.4rem;background:#fff;font-size:.7rem}
+
+    /* Cetak */
+    #printArea{display:none}
+    @media print{
+      body{background:#fff}
+      aside, header, .modal, #sidebarOverlay, .print\:hide{display:none!important}
+      #printArea{display:block!important}
+    }
+  </style>
+</head>
+<body>
+  <div class="flex h-screen bg-slate-50">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-slate-800 text-white flex-shrink-0 flex-col fixed inset-y-0 left-0 z-30 transform -translate-x-full md:relative md:translate-x-0">
+      <div class="p-5 text-2xl font-bold border-b border-slate-700 flex items-center justify-between">
+        <div><i class="fas fa-flask mr-2 text-blue-400"></i><span>SIMLAB IPA</span></div>
+        <button id="closeSidebarBtn" class="md:hidden text-2xl text-slate-400 hover:text-white">&times;</button>
+      </div>
+      <nav class="flex-1 p-4 space-y-2">
+        <a class="sidebar-item active flex items-center p-3 rounded-lg" onclick="showPage('dashboard')"><i class="fas fa-gauge-high w-6 mr-3"></i><span>Dasbor</span></a>
+        <a class="sidebar-item flex items-center p-3 rounded-lg" onclick="showPage('inventaris')"><i class="fas fa-boxes-stacked w-6 mr-3"></i><span>Inventaris</span></a>
+        <a class="sidebar-item flex items-center p-3 rounded-lg" onclick="showPage('peminjaman')"><i class="fas fa-hand-holding w-6 mr-3"></i><span>Peminjaman</span></a>
+        <a class="sidebar-item flex items-center p-3 rounded-lg" onclick="showPage('jadwal')"><i class="fas fa-calendar-days w-6 mr-3"></i><span>Jadwal</span></a>
+        <a class="sidebar-item flex items-center p-3 rounded-lg" onclick="showPage('rekap')"><i class="fas fa-chart-pie w-6 mr-3"></i><span>Rekap</span></a>
+        <a class="sidebar-item flex items-center p-3 rounded-lg" onclick="showPage('pengaturan')"><i class="fas fa-gear w-6 mr-3"></i><span>Pengaturan</span></a>
+      </nav>
+      <div class="p-4 border-t border-slate-700">
+        <a class="flex items-center p-3 rounded-lg hover:bg-slate-700" onclick="exportJSON()">
+          <i class="fas fa-download w-6 mr-3"></i><span>Backup JSON</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="flex-1 flex flex-col">
+      <header class="bg-white shadow-sm p-4 flex items-center justify-between md:justify-end">
+        <button id="openSidebarBtn" class="md:hidden text-xl text-slate-600"><i class="fas fa-bars"></i></button>
+        <div class="text-right">
+          <p class="font-semibold" id="activeUser">Admin Laboratorium</p>
+          <p class="text-sm text-slate-500">SIMLAB IPA — Plus</p>
+        </div>
+      </header>
+
+      <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+        <!-- DASHBOARD -->
+        <section id="dashboard" class="content-section active">
+          <h1 class="text-3xl font-bold mb-6">Dasbor</h1>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition flex items-center gap-4">
+              <div class="bg-blue-100 text-blue-600 p-4 rounded-full"><i class="fas fa-boxes-stacked text-2xl"></i></div>
+              <div><p class="text-slate-500">Jenis Barang</p><p id="cardTotalBarang" class="text-3xl font-bold">0</p></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition flex items-center gap-4">
+              <div class="bg-emerald-100 text-emerald-600 p-4 rounded-full"><i class="fas fa-box-open text-2xl"></i></div>
+              <div><p class="text-slate-500">Unit Tersedia</p><p id="cardStokTersedia" class="text-3xl font-bold">0</p></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition flex items-center gap-4">
+              <div class="bg-yellow-100 text-yellow-600 p-4 rounded-full"><i class="fas fa-hand-holding text-2xl"></i></div>
+              <div><p class="text-slate-500">Sedang Dipinjam</p><p id="cardDipinjam" class="text-3xl font-bold">0</p></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition flex items-center gap-4">
+              <div class="bg-violet-100 text-violet-600 p-4 rounded-full"><i class="fas fa-calendar-check text-2xl"></i></div>
+              <div><p class="text-slate-500">Jadwal Hari Ini</p><p id="cardJadwalHariIni" class="text-3xl font-bold">0</p></div>
+            </div>
+          </div>
+
+          <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold">Peminjaman Aktif / Terlambat</h2>
+                <button class="px-3 py-2 bg-slate-100 rounded-lg text-sm" onclick="showPage('peminjaman')"><i class="fa fa-arrow-right mr-2"></i>Kelola</button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead><tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="p-3">Peminjam</th><th class="p-3">Barang</th><th class="p-3">Unit</th><th class="p-3">Pinjam</th><th class="p-3">Kembali</th><th class="p-3">Status</th><th class="p-3">Aksi</th>
+                  </tr></thead>
+                  <tbody id="dashboardLoansBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold">Top Barang Paling Sering Dipinjam (30 hari)</h2>
+                <div class="text-sm text-slate-500">Filter: <span id="dsFilterLbl">30 hari</span></div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead><tr class="bg-slate-50 border-b border-slate-200"><th class="p-3">Barang</th><th class="p-3">Dipinjam</th></tr></thead>
+                  <tbody id="topItemsBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INVENTARIS -->
+        <section id="inventaris" class="content-section">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h1 class="text-3xl font-bold">Inventaris Lab IPA</h1>
+            <div class="flex gap-2 w-full sm:w-auto">
+              <button class="w-1/2 sm:w-auto bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center" onclick="printLabels()">
+                <i class="fas fa-print mr-2"></i>Cetak Label
+              </button>
+              <button class="w-1/2 sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center" onclick="openTambahBarang()">
+                <i class="fas fa-plus mr-2"></i>Tambah
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow">
+            <div class="mb-4 flex flex-col md:flex-row gap-3">
+              <div class="flex w-full gap-2">
+                <input id="searchInput" type="text" placeholder="Cari nama, kode, unit, atau scan QR..." class="flex-grow p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <button class="px-3 rounded-lg border border-slate-300 hover:bg-slate-100" title="Scan QR" onclick="openQRScanner('search')"><i class="fa fa-qrcode"></i></button>
+              </div>
+              <select id="kategoriFilter" class="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="Semua">Semua Kategori</option>
+                <option value="Peralatan Fisika">Peralatan Fisika</option>
+                <option value="Peralatan Biologi & Kimia">Peralatan Biologi & Kimia</option>
+                <option value="Peralatan Umum & Penunjang Lab">Peralatan Umum & Penunjang Lab</option>
+              </select>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="p-3">Foto</th><th class="p-3">Kode</th><th class="p-3">Nama</th>
+                    <th class="p-3">Kategori</th><th class="p-3">Jumlah</th><th class="p-3">Kondisi</th><th class="p-3">Unit</th><th class="p-3">Lokasi</th><th class="p-3">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="inventarisTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- PEMINJAMAN -->
+        <section id="peminjaman" class="content-section">
+          <h1 class="text-3xl font-bold mb-6">Peminjaman</h1>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold">Daftar Peminjaman Aktif</h2>
+                <div class="flex gap-2">
+                  <button class="px-3 py-2 rounded-lg border" onclick="openQRScanner('return')"><i class="fa fa-qrcode mr-1"></i>Scan Kembali</button>
+                  <button class="px-3 py-2 bg-slate-100 rounded-lg text-sm" onclick="exportLoans()">Export</button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead><tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="p-3">Peminjam</th><th class="p-3">Role</th><th class="p-3">Barang</th><th class="p-3">Unit</th><th class="p-3">Pinjam</th><th class="p-3">Kembali</th><th class="p-3">Status</th><th class="p-3">Aksi</th>
+                  </tr></thead>
+                  <tbody id="peminjamanTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow">
+              <h2 class="text-xl font-bold mb-4">Form Peminjaman</h2>
+              <form id="peminjamanForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium">Role</label>
+                    <select id="pinRole" class="mt-1 w-full p-2 border rounded-lg">
+                      <option>Guru</option>
+                      <option>Siswa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium">Nama Peminjam</label>
+                    <input type="text" id="pinNama" placeholder="Nama guru/siswa" class="mt-1 w-full p-2 border rounded-lg" required>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium">Kelas (opsional)</label>
+                    <input type="text" id="pinKelas" placeholder="XI IPA-1" class="mt-1 w-full p-2 border rounded-lg">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium">Keperluan</label>
+                    <input type="text" id="pinKeperluan" placeholder="Praktikum Listrik Dinamis" class="mt-1 w-full p-2 border rounded-lg">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium">Pilih Barang</label>
+                  <select id="pinBarang" class="mt-1 w-full p-2 border rounded-lg" required></select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium">Jumlah Unit</label>
+                    <input type="number" id="pinJumlah" class="mt-1 w-full p-2 border rounded-lg" min="1" value="1" required>
+                    <p id="pinStokInfo" class="text-xs text-slate-500 mt-1">Stok tersedia: -</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium">Tanggal Kembali</label>
+                    <input type="date" id="pinKembali" class="mt-1 w-full p-2 border rounded-lg" required>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium">Catatan</label>
+                  <textarea id="pinCatatan" rows="2" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: butuh kabel tambahan"></textarea>
+                </div>
+                <div class="flex gap-2">
+                  <button type="button" class="px-3 py-2 rounded-lg border" onclick="openQRScanner('loan')"><i class="fa fa-qrcode mr-1"></i>Scan QR Unit</button>
+                  <button class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 rounded-lg">Ajukan</button>
+                </div>
+              </form>
+              <div id="pickedUnits" class="mt-3 hidden">
+                <p class="text-sm text-slate-600 mb-1">Unit yang dipilih:</p>
+                <div id="pickedUnitsWrap" class="flex flex-wrap gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- JADWAL -->
+        <section id="jadwal" class="content-section">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h1 class="text-3xl font-bold">Jadwal Lab IPA</h1>
+            <button class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg" onclick="openJadwalModal()"><i class="fas fa-plus mr-2"></i>Buat Jadwal</button>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow">
+            <div class="flex items-center justify-between mb-4">
+              <button class="text-slate-600 hover:text-black p-2 rounded-full hover:bg-slate-200" onclick="prevMonth()"><i class="fas fa-chevron-left"></i></button>
+              <h2 id="monthTitle" class="text-xl font-bold"></h2>
+              <button class="text-slate-600 hover:text-black p-2 rounded-full hover:bg-slate-200" onclick="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center font-semibold text-slate-600">
+              <div class="p-2 hidden md:block">Minggu</div><div class="p-2 md:hidden">M</div>
+              <div class="p-2 hidden md:block">Senin</div><div class="p-2 md:hidden">S</div>
+              <div class="p-2 hidden md:block">Selasa</div><div class="p-2 md:hidden">S</div>
+              <div class="p-2 hidden md:block">Rabu</div><div class="p-2 md:hidden">R</div>
+              <div class="p-2 hidden md:block">Kamis</div><div class="p-2 md:hidden">K</div>
+              <div class="p-2 hidden md:block">Jumat</div><div class="p-2 md:hidden">J</div>
+              <div class="p-2 hidden md:block">Sabtu</div><div class="p-2 md:hidden">S</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-center"></div>
+          </div>
+
+          <div class="mt-6 bg-white p-6 rounded-xl shadow">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-bold">Detail Jadwal (hari terpilih)</h2>
+              <button class="px-3 py-2 rounded border" onclick="printDaySchedule()"><i class="fa fa-print mr-1"></i>Cetak</button>
+            </div>
+            <div id="dayScheduleWrap" class="mt-3">
+              <p class="text-slate-500 text-sm">Klik tanggal pada kalender untuk melihat daftar jadwal.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- REKAP -->
+        <section id="rekap" class="content-section">
+          <h1 class="text-3xl font-bold mb-6">Rekap Penggunaan Lab IPA</h1>
+          <div class="bg-white p-6 rounded-xl shadow space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-sm font-medium">Bulan</label>
+                <select id="rkBulan" class="mt-1 w-full p-2 border rounded-lg"></select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">Tahun</label>
+                <select id="rkTahun" class="mt-1 w-full p-2 border rounded-lg"></select>
+              </div>
+              <div class="md:col-span-2 flex items-end gap-2">
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg" onclick="renderRekap()">Terapkan</button>
+                <button class="px-4 py-2 border rounded-lg" onclick="exportRekap()">Export CSV</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead><tr class="bg-slate-50 border-b border-slate-200">
+                  <th class="p-3">Tanggal</th><th class="p-3">Peminjam</th><th class="p-3">Role</th><th class="p-3">Kelas</th><th class="p-3">Barang</th><th class="p-3">Unit</th><th class="p-3">Keperluan</th><th class="p-3">Pinjam</th><th class="p-3">Kembali</th><th class="p-3">Status</th>
+                </tr></thead>
+                <tbody id="rekapBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-500">Total Transaksi</p>
+                <p id="rkTotal" class="text-3xl font-bold">0</p>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-500">Terlambat</p>
+                <p id="rkLate" class="text-3xl font-bold">0</p>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-500">Barang Terpopuler</p>
+                <p id="rkTopItem" class="text-lg font-semibold">-</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PENGATURAN -->
+        <section id="pengaturan" class="content-section">
+          <h1 class="text-3xl font-bold mb-6">Pengaturan & Data</h1>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow space-y-4">
+              <h2 class="text-xl font-bold">Kode Barang</h2>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium">Prefix Tahun</label>
+                  <input id="cfgPrefix" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="DAK.2025" value="DAK.2025">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium">Format Kategori</label>
+                  <select id="cfgFormat" class="mt-1 w-full p-2 border rounded-lg">
+                    <option value="F/B/U">F/B/U</option>
+                    <option value="F1&F2/B2/B4/U">F1&F2/B2/B4/U</option>
+                  </select>
+                </div>
+              </div>
+              <p class="text-sm text-slate-500">Contoh hasil: <span id="previewKode" class="font-mono">DAK.2025 / F / 001</span></p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow space-y-4">
+              <h2 class="text-xl font-bold">Backup & Restore</h2>
+              <div class="flex flex-wrap gap-2">
+                <button class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg" onclick="exportJSON()"><i class="fa fa-download mr-2"></i>Backup JSON</button>
+                <label class="bg-slate-100 px-4 py-2 rounded-lg cursor-pointer">
+                  <i class="fa fa-upload mr-2"></i>Restore JSON
+                  <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importJSON(this.files[0])">
+                </label>
+                <button class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg" onclick="resetDemo()"><i class="fa fa-recycle mr-2"></i>Reset Data Demo</button>
+              </div>
+              <p class="text-sm text-slate-500">Backup mencakup inventaris, peminjaman, jadwal, dan log. Data disimpan lokal (localStorage).</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Overlay for mobile sidebar -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-20 hidden md:hidden"></div>
+
+  <!-- MODAL: Tambah / Edit Barang -->
+  <div id="barangModal" class="modal fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4" onclick="closeModal(event, this)">
+    <div class="modal-content bg-white rounded-xl shadow-2xl p-6 w-full max-w-xl m-4" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+        <h2 id="barangModalTitle" class="text-2xl font-bold">Tambah Barang</h2>
+        <button class="text-2xl leading-none text-slate-500 hover:text-slate-800" onclick="hideBarangModal()">&times;</button>
+      </div>
+      <form id="barangForm" class="space-y-4">
+        <input type="hidden" id="brgMode" value="tambah">
+        <input type="hidden" id="brgOldKode">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Kode</label>
+            <input id="brgKode" type="text" class="mt-1 w-full p-2 border rounded-lg bg-slate-100" readonly required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Nama Barang</label>
+            <input id="brgNama" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: Tabung Reaksi" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Foto</label>
+            <div class="flex items-center gap-4 mt-1">
+              <img id="brgPreview" class="w-16 h-16 rounded-lg object-cover border" src="https://placehold.co/100x100/e2e8f0/94a3b8?text=Foto">
+              <input id="brgFoto" type="file" accept="image/*" class="block w-full text-sm">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Kategori</label>
+            <select id="brgKategori" class="mt-1 w-full p-2 border rounded-lg">
+              <option>Peralatan Fisika</option>
+              <option>Peralatan Biologi & Kimia</option>
+              <option>Peralatan Umum & Penunjang Lab</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Jumlah Total</label>
+            <input id="brgJumlah" type="number" min="0" class="mt-1 w-full p-2 border rounded-lg" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Kondisi</label>
+            <select id="brgKondisi" class="mt-1 w-full p-2 border rounded-lg">
+              <option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Lokasi</label>
+            <input id="brgLokasi" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="Lemari A / Rak 2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Sumber Dana</label>
+            <input id="brgSumber" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="DAK / BOS / Hibah">
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Harga Perolehan (opsional)</label>
+            <input id="brgHarga" type="number" class="mt-1 w-full p-2 border rounded-lg" placeholder="0">
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Tanggal Perolehan</label>
+            <input id="brgTgl" type="date" class="mt-1 w-full p-2 border rounded-lg">
+          </div>
+        </div>
+        <div class="text-sm text-slate-500 -mt-2">Unit per-item akan dibuat otomatis: <span class="font-mono">KODE-01, KODE-02, ...</span></div>
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="px-4 py-2 rounded-lg bg-slate-100" onclick="hideBarangModal()">Batal</button>
+          <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Simpan</button>
+        </div>
+      </form>
+
+      <!-- Unit manager (only on edit) -->
+      <div id="unitManager" class="mt-6 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Manajemen Unit</h3>
+          <button class="px-3 py-1 rounded border text-sm" onclick="printUnitLabels()"><i class="fa fa-qrcode mr-1"></i>Cetak QR Unit</button>
+        </div>
+        <div id="unitList" class="flex flex-wrap gap-2"></div>
+        <p class="text-xs text-slate-500 mt-2">Klik unit untuk mengubah status: <span class="kbd">A</span> = tersedia, <span class="kbd">L</span> = dipinjam, <span class="kbd">M</span> = perawatan, <span class="kbd">R</span> = tidak aktif.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Jadwal -->
+  <div id="jadwalModal" class="modal fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4" onclick="closeModal(event, this)">
+    <div class="modal-content bg-white rounded-xl shadow-2xl p-6 w-full max-w-md m-4" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+        <h2 class="text-2xl font-bold">Buat Jadwal</h2>
+        <button class="text-2xl leading-none text-slate-500 hover:text-slate-800" onclick="hideJadwalModal()">&times;</button>
+      </div>
+      <form id="jadwalForm" class="space-y-4">
+        <div><label class="block text-sm font-medium">Nama Guru</label><input id="jdGuru" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="Nama guru" required></div>
+        <div><label class="block text-sm font-medium">Keperluan</label><input id="jdPerlu" type="text" class="mt-1 w-full p-2 border rounded-lg" placeholder="Praktikum Kelas XII-A" required></div>
+        <div><label class="block text-sm font-medium">Tanggal</label><input id="jdTanggal" type="date" class="mt-1 w-full p-2 border rounded-lg" required></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium">Mulai</label><input id="jdMulai" type="time" class="mt-1 w-full p-2 border rounded-lg" required></div>
+          <div><label class="block text-sm font-medium">Selesai</label><input id="jdSelesai" type="time" class="mt-1 w-full p-2 border rounded-lg" required></div>
+        </div>
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="px-4 py-2 rounded-lg bg-slate-100" onclick="hideJadwalModal()">Batal</button>
+          <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: QR Scanner -->
+  <div id="qrModal" class="modal fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4" onclick="closeModal(event, this)">
+    <div class="modal-content bg-white rounded-xl shadow-2xl p-4 w-full max-w-md" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-2">
+        <h3 class="text-lg font-semibold"><i class="fa fa-qrcode mr-2"></i>Scan QR</h3>
+        <button class="text-xl" onclick="hideQR()">&times;</button>
+      </div>
+      <div class="space-y-2">
+        <video id="qrVideo" class="w-full rounded-lg bg-black"></video>
+        <canvas id="qrCanvas" class="hidden"></canvas>
+        <p id="qrStatus" class="text-sm text-slate-600">Arahkan kamera ke QR label unit.</p>
+        <div class="flex gap-2">
+          <button class="flex-1 px-3 py-2 rounded border" onclick="hideQR()">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT AREA: Label Page -->
+  <div id="printArea" class="p-4">
+    <h2 class="text-xl font-bold mb-2">Label Unit</h2>
+    <div id="labelWrap" class="grid grid-cols-3 gap-4"></div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow hidden"></div>
+
+  <script>
+    /* ----------------- Util & Storage ------------------ */
+    const LS_KEYS = {
+      inv: 'simlab_inventory_v3',  // v3: tambah meta (lokasi, sumber, harga, tgl), units status enum
+      loans: 'simlab_loans_v3',
+      jadwal: 'simlab_schedule_v1',
+      cfg: 'simlab_cfg_v1',
+      logs: 'simlab_logs_v1'
+    };
+    const placeholderFoto = 'https://placehold.co/100x100/e2e8f0/94a3b8?text=Foto';
+    const $ = (id) => document.getElementById(id);
+    function toast(msg){const el=$('toast'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'), 1800);}    
+    function save(key, data){localStorage.setItem(key, JSON.stringify(data));}
+    function load(key, def){try{const v=JSON.parse(localStorage.getItem(key)); return Array.isArray(def)? (v||def) : (v??def);}catch(e){return def}}
+    function todayStr(){const d=new Date(); return d.toISOString().slice(0,10)}
+    function fmtDate(s){if(!s) return '-'; const d=new Date(s); return d.toLocaleDateString('id-ID')}
+
+    /* ----------------- Global State ------------------ */
+    let inventory = load(LS_KEYS.inv, []);
+    let loans = load(LS_KEYS.loans, []);
+    let schedule = load(LS_KEYS.jadwal, []);
+    let cfg = load(LS_KEYS.cfg, {prefix:'DAK.2025', format:'F/B/U'});
+    let logs = load(LS_KEYS.logs, []);
+    let currentDate = new Date();
+    let selectedDay = null;
+    const UnitStatus = { AVAILABLE:'A', LOANED:'L', MAINT:'M', RETIRED:'R' };
+
+    function persistAll(){ save(LS_KEYS.inv, inventory); save(LS_KEYS.loans, loans); save(LS_KEYS.jadwal, schedule); save(LS_KEYS.cfg, cfg); save(LS_KEYS.logs, logs); }
+
+    /* ----------------- Migrations (v1/v2 -> v3) ------------------ */
+    function kodeCategoryMap(cat){
+      const format = cfg.format;
+      if(format==='F1&F2/B2/B4/U'){
+        if(cat==='Peralatan Fisika') return 'F1&F2';
+        if(cat==='Peralatan Biologi & Kimia') return 'B2';
+        if(cat==='Peralatan Umum & Penunjang Lab') return 'U';
+      }else{
+        if(cat==='Peralatan Fisika') return 'F';
+        if(cat==='Peralatan Biologi & Kimia') return 'B';
+        if(cat==='Peralatan Umum & Penunjang Lab') return 'U';
+      }
+      return 'GEN';
+    }
+    function nextKode(cat){
+      const catCode = kodeCategoryMap(cat);
+      let max = 0;
+      inventory.filter(i=>i.kode.includes(` / ${catCode} / `)).forEach(i=>{
+        const n = parseInt(i.kode.split('/').pop().trim(),10); if(!isNaN(n) && n>max) max=n;
+      });
+      const num = String(max+1).padStart(3,'0');
+      return `${cfg.prefix} / ${catCode} / ${num}`;
+    }
+
+    function ensureUnits(item){
+      const total = item.jumlahTotal||0;
+      if(!Array.isArray(item.units)) item.units = [];
+      const existingMap = new Map((item.units||[]).map(u=>[u.unitCode,u]));
+      const units = [];
+      for(let i=1;i<=total;i++){
+        const serial = String(i).padStart(2,'0');
+        const unitCode = `${item.kode}-${serial}`;
+        const old = existingMap.get(unitCode);
+        units.push({ unitCode, status: old? (old.status || (old.available? UnitStatus.AVAILABLE:UnitStatus.LOANED)) : UnitStatus.AVAILABLE });
+      }
+      item.units = units;
+      item.jumlahTersedia = units.filter(u=>u.status===UnitStatus.AVAILABLE).length;
+      return item;
+    }
+
+    function migrateFromOlder(){
+      // v2 -> v3
+      const inv2 = JSON.parse(localStorage.getItem('simlab_inventory_v2')||'null');
+      if(Array.isArray(inv2) && (!inventory || inventory.length===0)){
+        inventory = inv2.map(it=>{
+          const cloned = {...it};
+          cloned.lokasi = cloned.lokasi || '';
+          cloned.sumber = cloned.sumber || '';
+          cloned.harga = cloned.harga || 0;
+          cloned.tglPeroleh = cloned.tglPeroleh || '';
+          if(Array.isArray(cloned.units)){
+            cloned.units = cloned.units.map(u=>({unitCode:u.unitCode, status: (u.available===false)? UnitStatus.LOANED : UnitStatus.AVAILABLE}));
+          }
+          ensureUnits(cloned);
+          return cloned;
+        });
+        save(LS_KEYS.inv, inventory);
+      }
+      // v1 -> v3
+      const inv1 = JSON.parse(localStorage.getItem('simlab_inventory_v1')||'null');
+      if(Array.isArray(inv1) && (!inventory || inventory.length===0)){
+        inventory = inv1.map(it=>{
+          const cloned = {...it, lokasi:'', sumber:'', harga:0, tglPeroleh:''};
+          ensureUnits(cloned);
+          return cloned;
+        });
+        save(LS_KEYS.inv, inventory);
+      }
+      // loans
+      const loans2 = JSON.parse(localStorage.getItem('simlab_loans_v2')||'null');
+      if(Array.isArray(loans2) && (!loans || loans.length===0)){
+        loans = loans2.map(l=>({...l, role:l.role||'Guru', kelas:l.kelas||'', keperluan:l.keperluan||'', catatan:l.catatan||''}));
+        save(LS_KEYS.loans, loans);
+      }
+      const loans1 = JSON.parse(localStorage.getItem('simlab_loans_v1')||'null');
+      if(Array.isArray(loans1) && (!loans || loans.length===0)){
+        loans = loans1.map(l=>({...l, units: l.units||[], role:'Guru', kelas:'', keperluan:'', catatan:''}));
+        save(LS_KEYS.loans, loans);
+      }
+    }
+
+    /* ----------------- Sidebar ------------------ */
+    const sidebar = $('sidebar'), openBtn=$('openSidebarBtn'), closeBtn=$('closeSidebarBtn'), overlay=$('sidebarOverlay');
+    openBtn.addEventListener('click', ()=>{sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden');});
+    function closeSidebar(){sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden')}
+    if(closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if(overlay) overlay.addEventListener('click', closeSidebar);
+
+    function showPage(id){
+      document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active'));
+      $(id).classList.add('active');
+      document.querySelectorAll('.sidebar-item').forEach(i=>i.classList.remove('active'));
+      document.querySelectorAll('.sidebar-item').forEach(i=>{ if(i.getAttribute('onclick')===`showPage('${id}')`) i.classList.add('active'); });
+      if(window.innerWidth<768) closeSidebar();
+      if(id==='rekap'){ initRekapFilters(); renderRekap(); }
+    }
+
+    /* ----------------- INVENTARIS ------------------ */
+    function renderInventarisTable(){
+      const q = $('searchInput').value.toLowerCase();
+      const k = $('kategoriFilter').value;
+      const body = $('inventarisTableBody');
+      body.innerHTML='';
+      const filtered = inventory.filter(it=>{
+        const nameHit = it.nama.toLowerCase().includes(q);
+        const codeHit = it.kode.toLowerCase().includes(q) || (it.units||[]).some(u=>u.unitCode.toLowerCase().includes(q));
+        const catHit = (k==='Semua' || it.kategori===k);
+        return (nameHit || codeHit) && catHit;
+      });
+      if(!filtered.length){ body.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-slate-500">Data tidak ditemukan.</td></tr>`; return; }
+      filtered.forEach(it=>{
+        const kondClass = it.kondisi==='Baik' ? 'green' : (it.kondisi==='Rusak Ringan' ? 'yellow' : 'rose');
+        const unitChips = (it.units||[]).map(u=>{
+          const color = (u.status===UnitStatus.AVAILABLE)? 'border-emerald-300 text-emerald-700 bg-emerald-50' :
+                        (u.status===UnitStatus.LOANED)? 'border-yellow-300 text-yellow-700 bg-yellow-50' :
+                        (u.status===UnitStatus.MAINT)? 'border-blue-300 text-blue-700 bg-blue-50' :
+                        'border-slate-300 text-slate-700 bg-slate-50';
+          return `<span class="chip tag ${color}">${u.unitCode}</span>`
+        }).join(' ');
+        body.insertAdjacentHTML('beforeend', `
+          <tr class="hover:bg-slate-50 align-top">
+            <td class="p-3"><img src="${it.foto||placeholderFoto}" class="w-12 h-12 rounded-lg object-cover border"></td>
+            <td class="p-3 font-mono text-xs">${it.kode}</td>
+            <td class="p-3 font-medium">${it.nama}</td>
+            <td class="p-3 text-slate-600">${it.kategori}</td>
+            <td class="p-3 text-slate-600">${(it.jumlahTersedia??0)} / ${(it.jumlahTotal??0)}</td>
+            <td class="p-3"><span class="badge ${kondClass}">${it.kondisi}</span></td>
+            <td class="p-3"><div class="flex flex-wrap gap-1 max-w-[420px]">${unitChips}</div></td>
+            <td class="p-3 text-slate-600">${it.lokasi||'-'}</td>
+            <td class="p-3 space-x-2">
+              <button class="text-blue-600 hover:text-blue-800" title="Edit" onclick="editBarang('${it.kode.replace(/'/g, "\\'")}')"><i class="fa fa-edit"></i></button>
+              <button class="text-rose-600 hover:text-rose-800" title="Hapus" onclick="hapusBarang('${it.kode.replace(/'/g, "\\'")}')"><i class="fa fa-trash"></i></button>
+            </td>
+          </tr>`);
+      });
+    }
+    $('searchInput').addEventListener('input', renderInventarisTable);
+    $('kategoriFilter').addEventListener('change', renderInventarisTable);
+
+    function openTambahBarang(){
+      $('barangModalTitle').textContent='Tambah Barang';
+      $('brgMode').value = 'tambah';
+      $('brgOldKode').value = '';
+      $('brgNama').value='';
+      $('brgKategori').value='Peralatan Fisika';
+      $('brgJumlah').value='1';
+      $('brgKondisi').value='Baik';
+      $('brgPreview').src = placeholderFoto;
+      $('brgFoto').value='';
+      $('brgKode').value = nextKode('Peralatan Fisika');
+      $('brgLokasi').value='';
+      $('brgSumber').value='';
+      $('brgHarga').value='';
+      $('brgTgl').value='';
+      $('unitManager').classList.add('hidden');
+      showBarangModal();
+    }
+
+    function editBarang(kode){
+      const it = inventory.find(i=>i.kode===kode); if(!it) return;
+      $('barangModalTitle').textContent='Edit Barang';
+      $('brgMode').value = 'edit';
+      $('brgOldKode').value = it.kode;
+      $('brgKode').value = it.kode;
+      $('brgNama').value = it.nama;
+      $('brgKategori').value = it.kategori;
+      $('brgJumlah').value = it.jumlahTotal;
+      $('brgKondisi').value = it.kondisi;
+      $('brgPreview').src = it.foto||placeholderFoto;
+      $('brgFoto').value='';
+      $('brgLokasi').value = it.lokasi||'';
+      $('brgSumber').value = it.sumber||'';
+      $('brgHarga').value = it.harga||'';
+      $('brgTgl').value = it.tglPeroleh||'';
+      ensureUnits(it);
+      showBarangModal();
+      renderUnitManager(it);
+    }
+
+    function renderUnitManager(item){
+      const wrap = $('unitList'); wrap.innerHTML='';
+      (item.units||[]).forEach(u=>{
+        let cls = 'border-emerald-300 text-emerald-700 bg-emerald-50';
+        if(u.status===UnitStatus.LOANED) cls = 'border-yellow-300 text-yellow-700 bg-yellow-50';
+        else if(u.status===UnitStatus.MAINT) cls = 'border-blue-300 text-blue-700 bg-blue-50';
+        else if(u.status===UnitStatus.RETIRED) cls = 'border-slate-300 text-slate-700 bg-slate-50';
+        const el = document.createElement('button');
+        el.className = `tag ${cls}`;
+        el.textContent = u.unitCode;
+        el.title = 'Klik untuk ubah status';
+        el.onclick = ()=>{
+          const cur = u.status;
+          u.status = (cur===UnitStatus.AVAILABLE)? UnitStatus.MAINT :
+                     (cur===UnitStatus.MAINT)? UnitStatus.RETIRED :
+                     (cur===UnitStatus.RETIRED)? UnitStatus.AVAILABLE :
+                     UnitStatus.AVAILABLE;
+          renderUnitManager(item);
+          item.jumlahTersedia = (item.units||[]).filter(x=>x.status===UnitStatus.AVAILABLE).length;
+          persistAll(); renderInventarisTable(); populatePinBarang(); updateCards();
+        };
+        wrap.appendChild(el);
+      });
+      $('unitManager').classList.remove('hidden');
+    }
+
+    function hapusBarang(kode){
+      const idx = inventory.findIndex(i=>i.kode===kode);
+      if(idx<0) return;
+      const sedangDipinjam = loans.some(l=>l.barangKode===kode && l.status!=='Dikembalikan');
+      if(sedangDipinjam){ if(!confirm('Barang masih ada yang dipinjam. Yakin menghapus?')) return; }
+      inventory.splice(idx,1); persistAll(); renderInventarisTable(); populatePinBarang(); updateCards(); toast('Barang dihapus');
+    }
+
+    $('brgKategori').addEventListener('change', e=>{
+      if($('brgMode').value==='tambah'){
+        $('brgKode').value = nextKode(e.target.value);
+      }
+    });
+    $('brgFoto').addEventListener('change', function(){
+      const f=this.files[0]; if(!f) return;
+      const reader=new FileReader(); reader.onload=e=>{$('brgPreview').src=e.target.result}; reader.readAsDataURL(f);
+    });
+
+    $('barangForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const mode = $('brgMode').value;
+      const data = {
+        kode: $('brgKode').value,
+        nama: $('brgNama').value.trim(),
+        kategori: $('brgKategori').value,
+        jumlahTotal: parseInt($('brgJumlah').value,10)||0,
+        kondisi: $('brgKondisi').value,
+        foto: $('brgPreview').src||placeholderFoto,
+        lokasi: $('brgLokasi').value.trim(),
+        sumber: $('brgSumber').value.trim(),
+        harga: parseInt($('brgHarga').value||'0',10)||0,
+        tglPeroleh: $('brgTgl').value||''
+      };
+      if(mode==='tambah'){
+        ensureUnits(data);
+        inventory.push(data);
+      }else{
+        const idx = inventory.findIndex(i=>i.kode===$('brgOldKode').value);
+        if(idx>-1){
+          const old = inventory[idx];
+          inventory[idx] = {...old, ...data};
+          ensureUnits(inventory[idx]);
+        }
+      }
+      persistAll();
+      renderInventarisTable(); populatePinBarang(); updateCards();
+      hideBarangModal();
+      toast('Data barang tersimpan');
+    });
+
+    function showBarangModal(){const m=$('barangModal'); m.classList.remove('hidden'); m.classList.add('flex','show');}
+    function hideBarangModal(){const m=$('barangModal'); m.classList.add('hidden'); m.classList.remove('flex','show');}
+
+    /* ----------------- Peminjaman ------------------ */
+    function populatePinBarang(){
+      const sel = $('pinBarang'); sel.innerHTML = '<option value="">-- Pilih Barang --</option>';
+      inventory.forEach(it=>{ const stok=(it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length; if(stok>0) sel.insertAdjacentHTML('beforeend', `<option value="${it.kode}">${it.nama} (Stok: ${stok})</option>`)});
+    }
+    $('pinBarang').addEventListener('change', e=>{
+      const kode = e.target.value;
+      const it = inventory.find(i=>i.kode===kode);
+      const stok = it? (it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length : 0;
+      $('pinStokInfo').textContent = `Stok tersedia: ${stok}`;
+    });
+
+    let pickedUnitSet = new Set();
+    function addPickedUnit(unitCode){
+      if(pickedUnitSet.has(unitCode)) return;
+      pickedUnitSet.add(unitCode);
+      $('pickedUnits').classList.remove('hidden');
+      const wrap = $('pickedUnitsWrap');
+      const chip = document.createElement('span');
+      chip.className = 'tag border-emerald-300 text-emerald-700 bg-emerald-50';
+      chip.textContent = unitCode;
+      chip.onclick = ()=>{pickedUnitSet.delete(unitCode); chip.remove(); if(!pickedUnitSet.size) $('pickedUnits').classList.add('hidden')};
+      wrap.appendChild(chip);
+    }
+
+    $('peminjamanForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const kode = $('pinBarang').value;
+      const it = inventory.find(i=>i.kode===kode);
+      if(!it){ toast('Pilih barang'); return; }
+      const stok = (it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length;
+      const jumlah = Math.max(1, parseInt($('pinJumlah').value,10)||1);
+      const units = Array.from(pickedUnitSet);
+      if(units.length && units.length!==jumlah){ toast('Jumlah unit tidak sama dengan unit yang dipilih via scan'); return; }
+      if(!units.length){
+        (it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).slice(0,jumlah).forEach(u=>units.push(u.unitCode));
+      }
+      if(units.length>stok){ toast('Stok tidak cukup'); return; }
+      it.units.forEach(u=>{ if(units.includes(u.unitCode)) u.status = UnitStatus.LOANED; });
+      it.jumlahTersedia = (it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length;
+
+      const loan = {
+        id: 'L'+Date.now(),
+        peminjam: $('pinNama').value.trim(),
+        role: $('pinRole').value,
+        kelas: $('pinKelas').value.trim(),
+        keperluan: $('pinKeperluan').value.trim(),
+        barangKode: it.kode,
+        barangNama: it.nama,
+        units: units,
+        tglPinjam: todayStr(),
+        tglKembali: $('pinKembali').value,
+        catatan: $('pinCatatan').value.trim(),
+        status: 'Dipinjam'
+      };
+      loans.push(loan);
+      logs.push({ts:Date.now(), type:'pinjam', ref:loan.id, units:[...units], by:loan.peminjam});
+      pickedUnitSet.clear(); $('pickedUnitsWrap').innerHTML=''; $('pickedUnits').classList.add('hidden');
+      persistAll();
+      renderPeminjamanTable(); renderInventarisTable(); populatePinBarang(); updateCards();
+      toast('Peminjaman tercatat');
+      e.target.reset(); $('pinStokInfo').textContent='Stok tersedia: -';
+    });
+
+    function renderPeminjamanTable(){
+      const body = $('peminjamanTableBody');
+      const db = $('dashboardLoansBody');
+      body.innerHTML=''; db.innerHTML='';
+      loans.filter(l=>l.status!=='Dikembalikan').forEach(l=>{
+        const late = (new Date(l.tglKembali) < new Date(todayStr()));
+        const statusBadge = late? '<span class="badge yellow">Terlambat</span>' : '<span class="badge gray">Aktif</span>';
+        const row = `
+          <tr class="hover:bg-slate-50">
+            <td class="p-3">${l.peminjam}</td>
+            <td class="p-3">${l.role||'-'}</td>
+            <td class="p-3">${l.barangNama}</td>
+            <td class="p-3"><div class="flex flex-wrap gap-1">${l.units.map(u=>`<span class="chip tag border-slate-300">${u}</span>`).join(' ')}</div></td>
+            <td class="p-3">${fmtDate(l.tglPinjam)}</td>
+            <td class="p-3">${fmtDate(l.tglKembali)}</td>
+            <td class="p-3">${statusBadge}</td>
+            <td class="p-3 space-x-2">
+              <button class="text-emerald-600 hover:text-emerald-800" title="Kembalikan" onclick="kembalikan('${l.id}')"><i class="fa fa-rotate-left"></i></button>
+              <button class="text-rose-600 hover:text-rose-800" title="Batalkan" onclick="batalkan('${l.id}')"><i class="fa fa-times"></i></button>
+            </td>
+          </tr>`;
+        body.insertAdjacentHTML('beforeend', row);
+        // Versi ringkas untuk Dasbor (tanpa kolom Role)
+        const rowDash = row.replace(`<td class="p-3">${l.role||'-'}</td>`, '');
+        db.insertAdjacentHTML('beforeend', rowDash);
+      });
+    }
+
+    function kembalikan(id){
+      const l = loans.find(x=>x.id===id); if(!l) return;
+      const item = inventory.find(i=>i.kode===l.barangKode);
+      if(item){ item.units.forEach(u=>{ if(l.units.includes(u.unitCode)) u.status=UnitStatus.AVAILABLE }); item.jumlahTersedia=(item.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length; }
+      l.status='Dikembalikan'; logs.push({ts:Date.now(), type:'kembali', ref:l.id, units:[...l.units], by:l.peminjam});
+      persistAll(); renderPeminjamanTable(); renderInventarisTable(); populatePinBarang(); updateCards(); toast('Barang dikembalikan');
+    }
+    function batalkan(id){
+      if(!confirm('Batalkan peminjaman ini?')) return;
+      const l = loans.find(x=>x.id===id); if(!l) return;
+      const item = inventory.find(i=>i.kode===l.barangKode);
+      if(item){ item.units.forEach(u=>{ if(l.units.includes(u.unitCode)) u.status=UnitStatus.AVAILABLE }); item.jumlahTersedia=(item.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length; }
+      l.status='Dibatalkan'; logs.push({ts:Date.now(), type:'batal', ref:l.id, units:[...l.units], by:l.peminjam});
+      persistAll(); renderPeminjamanTable(); renderInventarisTable(); populatePinBarang(); updateCards(); toast('Peminjaman dibatalkan');
+    }
+
+    function exportLoans(){
+      const rows = [['ID','Peminjam','Role','Kelas','Keperluan','Barang','Units','TglPinjam','TglKembali','Status']].concat(
+        loans.map(l=>[l.id,l.peminjam,l.role||'',l.kelas||'',l.keperluan||'',l.barangNama,(l.units||[]).join(' '),l.tglPinjam,l.tglKembali,l.status])
+      );
+      const csv = rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+      downloadBlob(csv, 'peminjaman.csv', 'text/csv');
+    }
+
+    /* ----------------- JADWAL ------------------ */
+    function renderCalendar(){
+      const grid = $('calendarGrid'); grid.innerHTML='';
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const month = d.getMonth(), year = d.getFullYear();
+      $('monthTitle').textContent = d.toLocaleString('id-ID',{month:'long', year:'numeric'});
+      const startDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      for(let i=0;i<startDay;i++) grid.insertAdjacentHTML('beforeend','<div class="p-2"></div>');
+      for(let day=1; day<=daysInMonth; day++){
+        const dateStr = new Date(year, month, day).toISOString().slice(0,10);
+        const count = schedule.filter(j=>j.tanggal===dateStr).length;
+        grid.insertAdjacentHTML('beforeend', `<button class="p-2 border rounded-lg hover:bg-slate-50 text-left" onclick="selectDay('${dateStr}')">
+          <div class="font-semibold">${day}</div>
+          <div class="text-xs text-slate-500">${count} jadwal</div>
+        </button>`);
+      }
+    }
+    function prevMonth(){ currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1); renderCalendar(); }
+    function nextMonth(){ currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1); renderCalendar(); }
+    function openJadwalModal(){ const m=$('jadwalModal'); m.classList.remove('hidden'); m.classList.add('flex','show'); }
+    function hideJadwalModal(){ const m=$('jadwalModal'); m.classList.add('hidden'); m.classList.remove('flex','show'); }
+    $('jadwalForm').addEventListener('submit', e=>{
+      e.preventDefault();
+      const j = { id:'J'+Date.now(), guru:$('jdGuru').value.trim(), perlu:$('jdPerlu').value.trim(), tanggal:$('jdTanggal').value, mulai:$('jdMulai').value, selesai:$('jdSelesai').value };
+      schedule.push(j); persistAll(); hideJadwalModal(); renderCalendar(); updateCards(); toast('Jadwal dibuat');
+    });
+    function selectDay(dateStr){
+      selectedDay = dateStr;
+      const list = schedule.filter(j=>j.tanggal===dateStr);
+      const wrap = $('dayScheduleWrap');
+      if(!list.length){ wrap.innerHTML=`<p class="text-slate-500 text-sm">Tidak ada jadwal pada ${fmtDate(dateStr)}.</p>`; return; }
+      const rows = list.map(j=>`<tr class="border-b"><td class="p-2">${j.guru}</td><td class="p-2">${j.perlu}</td><td class="p-2">${j.mulai}–${j.selesai}</td></tr>`).join('');
+      wrap.innerHTML = `<div class="flex items-center justify-between mb-2"><div class="font-semibold">${fmtDate(dateStr)}</div><button class="text-rose-600 text-sm" onclick="hapusSemuaJadwal('${dateStr}')">Hapus semua</button></div>
+        <div class="overflow-x-auto"><table class="w-full"><thead><tr class="bg-slate-50"><th class="p-2">Guru</th><th class="p-2">Keperluan</th><th class="p-2">Waktu</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function printDaySchedule(){
+      if(!selectedDay){ toast('Pilih tanggal lebih dulu'); return; }
+      window.print();
+    }
+    function hapusSemuaJadwal(dateStr){
+      if(!confirm('Hapus semua jadwal pada hari ini?')) return;
+      schedule = schedule.filter(j=>j.tanggal!==dateStr); persistAll(); selectDay(dateStr); renderCalendar(); updateCards();
+    }
+
+    /* ----------------- REKAP ------------------ */
+    function initRekapFilters(){
+      const blnSel = $('rkBulan'); const thSel = $('rkTahun');
+      if(!blnSel.options.length){ for(let m=1;m<=12;m++) blnSel.insertAdjacentHTML('beforeend', `<option value="${m}">${new Date(2000,m-1,1).toLocaleString('id-ID',{month:'long'})}</option>`); }
+      if(!thSel.options.length){
+        const y = new Date().getFullYear();
+        for(let i=0;i<6;i++){ thSel.insertAdjacentHTML('beforeend', `<option>${y-i}</option>`); }
+      }
+      blnSel.value = String(new Date().getMonth()+1);
+      thSel.value = String(new Date().getFullYear());
+    }
+
+    function renderRekap(){
+      const m = parseInt($('rkBulan').value,10); const y = parseInt($('rkTahun').value,10);
+      const start = new Date(y, m-1, 1).toISOString().slice(0,10);
+      const end = new Date(y, m, 0).toISOString().slice(0,10);
+      const inMonth = loans.filter(l=> l.tglPinjam>=start && l.tglPinjam<=end );
+      const body = $('rekapBody'); body.innerHTML='';
+      if(!inMonth.length){ body.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-slate-500">Belum ada transaksi.</td></tr>`; }
+      let late=0; const byItem=new Map();
+      inMonth.forEach(l=>{
+        const isLate = (l.status!=='Dikembalikan') && (new Date(l.tglKembali) < new Date(todayStr()));
+        if(isLate) late++;
+        byItem.set(l.barangNama, (byItem.get(l.barangNama)||0)+1);
+        body.insertAdjacentHTML('beforeend', `<tr class="hover:bg-slate-50">
+          <td class="p-3">${fmtDate(l.tglPinjam)}</td>
+          <td class="p-3">${l.peminjam}</td>
+          <td class="p-3">${l.role||'-'}</td>
+          <td class="p-3">${l.kelas||'-'}</td>
+          <td class="p-3">${l.barangNama}</td>
+          <td class="p-3">${(l.units||[]).join(' ')}</td>
+          <td class="p-3">${l.keperluan||'-'}</td>
+          <td class="p-3">${fmtDate(l.tglPinjam)}</td>
+          <td class="p-3">${fmtDate(l.tglKembali)}</td>
+          <td class="p-3">${l.status}</td>
+        </tr>`);
+      });
+      $('rkTotal').textContent = inMonth.length;
+      $('rkLate').textContent = late;
+      let topItem = '-'; let max=0;
+      for(const [k,v] of byItem.entries()){ if(v>max){max=v; topItem=k;} }
+      $('rkTopItem').textContent = topItem;
+      // Dashboard top items (30 hari rolling)
+      const since = new Date(); since.setDate(since.getDate()-30);
+      const rolling = loans.filter(l=> new Date(l.tglPinjam)>=since );
+      const countMap = new Map();
+      rolling.forEach(l=> countMap.set(l.barangNama,(countMap.get(l.barangNama)||0)+1));
+      const arr = Array.from(countMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      const topBody = $('topItemsBody'); topBody.innerHTML='';
+      arr.forEach(([name,c])=> topBody.insertAdjacentHTML('beforeend', `<tr><td class="p-3">${name}</td><td class="p-3">${c}x</td></tr>`));
+    }
+
+    function exportRekap(){
+      const rows = [['Tanggal','Peminjam','Role','Kelas','Barang','Units','Keperluan','Pinjam','Kembali','Status']].concat(
+        Array.from($('rekapBody').querySelectorAll('tr')).map(tr=> Array.from(tr.querySelectorAll('td')).map(td=> td.textContent))
+      );
+      const csv = rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+      downloadBlob(csv, 'rekap.csv', 'text/csv');
+    }
+
+    /* ----------------- QR Scanner (search/loan/return) ------------------ */
+    let qrMode = 'search';
+    let stream = null, rafId=null;
+    function openQRScanner(mode='search'){
+      qrMode = mode;
+      const m=$('qrModal'); m.classList.remove('hidden'); m.classList.add('flex','show');
+      startScanner();
+    }
+    async function startScanner(){
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      }catch(e){ $('qrStatus').textContent='Kamera tidak tersedia'; return; }
+      const video=$('qrVideo'); video.srcObject=stream; video.setAttribute('playsinline', true); await video.play();
+      const canvas=$('qrCanvas'); const ctx=canvas.getContext('2d');
+      const tick=()=>{
+        if(video.readyState===video.HAVE_ENOUGH_DATA){
+          canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+          const code = jsQR(imageData.data, canvas.width, canvas.height);
+          if(code){
+            handleQR(code.data);
+            hideQR();
+            return;
+          }
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+      tick();
+    }
+    function hideQR(){
+      const m=$('qrModal'); m.classList.add('hidden'); m.classList.remove('flex','show');
+      if(rafId) cancelAnimationFrame(rafId);
+      const video=$('qrVideo'); if(video) video.pause();
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    }
+    function handleQR(text){
+      const unitCode = text.trim();
+      if(qrMode==='search'){
+        $('searchInput').value = unitCode;
+        renderInventarisTable();
+        showPage('inventaris');
+        toast('Unit ditemukan via QR');
+      }else if(qrMode==='loan'){
+        addPickedUnit(unitCode);
+      }else if(qrMode==='return'){
+        const active = loans.find(l=> l.status==='Dipinjam' && (l.units||[]).includes(unitCode) );
+        if(!active){ toast('Unit ini tidak sedang dipinjam'); return; }
+        kembalikan(active.id);
+      }
+    }
+
+    /* ----------------- Label Printing ------------------ */
+    function printLabels(){
+      const wrap = $('labelWrap'); wrap.innerHTML='';
+      inventory.forEach(it=>{
+        const card = document.createElement('div');
+        card.className = 'border rounded-lg p-2 text-center';
+        const name = document.createElement('div'); name.className='font-semibold text-sm mb-1'; name.textContent=it.nama; card.appendChild(name);
+        const qrHolder = document.createElement('div'); card.appendChild(qrHolder);
+        const code = document.createElement('div'); code.className='font-mono text-xs mt-1'; code.textContent=it.kode; card.appendChild(code);
+        wrap.appendChild(card);
+        new QRCode(qrHolder, {text: it.kode, width:96, height:96});
+      });
+      window.print();
+    }
+    function printUnitLabels(){
+      const kode = $('brgKode').value;
+      const it = inventory.find(i=>i.kode===kode); if(!it) return;
+      const wrap = $('labelWrap'); wrap.innerHTML='';
+      (it.units||[]).forEach(u=>{
+        const card = document.createElement('div');
+        card.className = 'border rounded-lg p-2 text-center';
+        const name = document.createElement('div'); name.className='font-semibold text-sm mb-1'; name.textContent=it.nama; card.appendChild(name);
+        const qrHolder = document.createElement('div'); card.appendChild(qrHolder);
+        const code = document.createElement('div'); code.className='font-mono text-xs mt-1'; code.textContent=u.unitCode; card.appendChild(code);
+        wrap.appendChild(card);
+        new QRCode(qrHolder, {text: u.unitCode, width:96, height:96});
+      });
+      window.print();
+    }
+
+    /* ----------------- Export/Import/Reset ------------------ */
+    function downloadBlob(content, filename, type='application/octet-stream'){
+      const blob = new Blob([content], {type}); const url = URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 500);
+    }
+    function exportJSON(){
+      const bundle = {inventory, loans, schedule, cfg, logs};
+      downloadBlob(JSON.stringify(bundle,null,2), 'simlab_backup.json', 'application/json');
+    }
+    async function importJSON(file){
+      if(!file) return;
+      const text = await file.text();
+      try{
+        const data = JSON.parse(text);
+        if(data.inventory) inventory = data.inventory;
+        if(data.loans) loans = data.loans;
+        if(data.schedule) schedule = data.schedule;
+        if(data.cfg) cfg = data.cfg;
+        if(data.logs) logs = data.logs;
+        persistAll(); renderAll(); toast('Data berhasil di-restore');
+      }catch(e){ alert('File tidak valid'); }
+    }
+    function resetDemo(){
+      if(!confirm('Reset semua data demo?')) return;
+      inventory=[]; loans=[]; schedule=[]; logs=[]; persistAll(); renderAll();
+    }
+
+    /* ----------------- Cards & Render All ------------------ */
+    function updateCards(){
+      $('cardTotalBarang').textContent = inventory.length;
+      $('cardStokTersedia').textContent = inventory.reduce((s,it)=> s + (it.units||[]).filter(u=>u.status===UnitStatus.AVAILABLE).length, 0);
+      $('cardDipinjam').textContent = loans.filter(l=>l.status==='Dipinjam').length;
+      const today = new Date().toISOString().slice(0,10);
+      $('cardJadwalHariIni').textContent = schedule.filter(j=>j.tanggal===today).length;
+    }
+    function renderAll(){
+      renderInventarisTable(); populatePinBarang(); renderPeminjamanTable(); renderCalendar(); updateCards(); initRekapFilters(); renderRekap();
+    }
+
+    /* ----------------- Init ------------------ */
+    migrateFromOlder();
+    renderAll();
+  </script>
+</body>
+</html>
